@@ -5,7 +5,7 @@
             {{ __('Hazards Management') }}
         </h2>
     </x-slot>
-
+    
     <!-- Inject the Livewire component. The component itself already has the max-w-7xl container and paddings -->
     <livewire:hazard-management />
 </x-app-layout>

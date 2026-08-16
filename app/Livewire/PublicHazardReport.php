@@ -15,12 +15,11 @@ class PublicHazardReport extends Component
     // Store available companies for the dropdown
     public $companies = [];
 
-    // Capture the company ID from the URL if accessed via a specific QR code (e.g., ?company_id=2)
+    // Capture the company ID from the URL if accessed via a specific QR code
     #[Url]
     public $company_id = '';
 
-    // Form fields based exactly on the original .NET SMS structure
-    public $is_anonymous = false;
+    // Form fields based on the new bilingual SMS-1 structure
     public $reporter_name = '';
     public $incident_date = '';
     public $department_area = '';
@@ -42,19 +41,21 @@ class PublicHazardReport extends Component
     public function submitReport()
     {
         // Validate the input data before processing
+        // Note: department_area is now nullable since it does not have an asterisk
         $this->validate([
             'company_id' => 'required|exists:companies,id',
             'incident_date' => 'required|date|before_or_equal:today',
-            'department_area' => 'required|string|max:255',
+            'department_area' => 'nullable|string|max:255',
             'employee_hazard_description' => 'required|string',
             'suggested_mitigation' => 'nullable|string',
+            'reporter_name' => 'nullable|string|max:255',
         ]);
 
         // Save the new hazard report utilizing Eloquent ORM
         HazardReport::create([
             'company_id' => $this->company_id,
-            // Evaluate the anonymous toggle to decide what to save
-            'reporter_name' => $this->is_anonymous ? null : $this->reporter_name,
+            // Save the name if provided, otherwise leave it as null
+            'reporter_name' => empty($this->reporter_name) ? null : $this->reporter_name,
             'incident_date' => $this->incident_date,
             'department_area' => $this->department_area,
             'employee_hazard_description' => $this->employee_hazard_description,

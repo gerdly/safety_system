@@ -1,120 +1,115 @@
-<div>
-    <div class="max-w-7xl mx-auto py-10 sm:px-6 lg:px-8">
+<div class="container mx-auto px-4 sm:px-8 mt-4 mb-5">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-md-center mb-6 gap-3">
+        <h2 class="text-2xl font-bold text-blue-700">Safety Management System - Reports</h2>
+    </div>
+
+    <!-- Session Alerts -->
+    @if (session()->has('message'))
+        <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4 shadow-sm" role="alert">
+            <p>{{ session('message') }}</p>
+        </div>
+    @endif
+
+    <div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
         
-        <!-- Header and Search Bar -->
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-semibold text-gray-800">Hazards Management</h2>
-            
-            <div class="w-full max-w-md">
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <!-- Search Icon -->
-                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <!-- Livewire model binding with a 300ms debounce to prevent excessive database queries -->
-                    <input 
-                        wire:model.live.debounce.300ms="search" 
-                        type="text" 
-                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm transition duration-150 ease-in-out" 
-                        placeholder="Search by department, description or reporter..."
-                    >
-                </div>
-            </div>
+        <!-- Loading State (Handled via Livewire target) -->
+        <div wire:loading wire:target="closeHazard" class="w-full p-5 text-center bg-gray-50 border-b border-gray-200">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Processing...</p>
         </div>
 
-        <!-- Data Table Card -->
-        <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg border border-gray-200">
+        @if($reports->isEmpty())
+            <div class="p-10 text-center text-gray-500">
+                <h5 class="text-lg font-medium">No hazard reports found.</h5>
+            </div>
+        @else
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full leading-normal">
+                    <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Incident Date</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reporter</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Risk Level</th>
-                            <th scope="col" class="relative px-6 py-3">
-                                <span class="sr-only">Actions</span>
-                            </th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ID</th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                            
+                            <!-- Hidden on mobile, visible on medium screens and up -->
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden md:table-cell">Company</th>
+                            
+                            <!-- Hidden on mobile/tablet, visible on large screens -->
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden lg:table-cell">Area</th>
+                            
+                            <!-- Hidden on mobile, visible on small screens and up -->
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider hidden sm:table-cell">Reporter</th>
+                            
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                            <th class="px-5 py-3 text-center md:text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <!-- Loop through the paginated hazards collection -->
-                        @forelse ($hazards as $hazard)
-                            <tr class="hover:bg-gray-50 transition duration-150">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    #{{ $hazard->id }}
+                    <tbody>
+                        @foreach ($reports as $report)
+                            <tr class="hover:bg-gray-50 border-b border-gray-100">
+                                
+                                <td class="px-5 py-4 whitespace-nowrap text-sm">
+                                    <strong class="text-gray-900">SMS-{{ $report->id }}</strong>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {{ \Carbon\Carbon::parse($hazard->incident_date)->format('M d, Y') }}
+                                
+                                <td class="px-5 py-4 whitespace-nowrap text-sm">
+                                    <span class="block text-gray-900">{{ \Carbon\Carbon::parse($report->incident_date)->format('m/d/Y') }}</span>
+                                    <small class="text-gray-500 block md:hidden">{{ \Carbon\Carbon::parse($report->incident_date)->format('H:i') }}</small>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {{ $hazard->department_area }}
+                                
+                                <td class="px-5 py-4 text-sm text-gray-900 hidden md:table-cell">
+                                    {{ $report->company->name ?? 'N/A' }}
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                                    <!-- Anonymous Reporting Logic applied in the UI -->
-                                    @if($hazard->reporter_name)
-                                        <span class="text-gray-900 font-medium">{{ $hazard->reporter_name }}</span>
+                                
+                                <td class="px-5 py-4 text-sm text-gray-900 hidden lg:table-cell">
+                                    {{ $report->department_area }}
+                                </td>
+                                
+                                <td class="px-5 py-4 text-sm text-gray-900 hidden sm:table-cell">
+                                    {{ empty($report->reporter_name) ? 'Anonymous' : $report->reporter_name }}
+                                </td>
+                                
+                                <td class="px-5 py-4 whitespace-nowrap text-sm">
+                                    @if (is_null($report->qaReview))
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Pending</span>
+                                    @elseif (is_null($report->qaReview->actual_closure_date))
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Open</span>
                                     @else
-                                        <span class="text-gray-400 italic">Anonymous</span>
+                                        <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Closed</span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <!-- Dynamic Risk Badge based on QA Review existence and score -->
-                                    @if($hazard->qaReview)
-                                        @php
-                                            $score = $hazard->qaReview->risk_score;
-                                            
-                                            // Determine badge color based on matrix values
-                                            if ($score >= 15) {
-                                                $badgeClass = 'bg-red-100 text-red-800';
-                                                $riskLabel = 'High';
-                                            } elseif ($score >= 8) {
-                                                $badgeClass = 'bg-yellow-100 text-yellow-800';
-                                                $riskLabel = 'Medium';
-                                            } else {
-                                                $badgeClass = 'bg-green-100 text-green-800';
-                                                $riskLabel = 'Low';
-                                            }
-                                        @endphp
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $badgeClass }}">
-                                            {{ $riskLabel }} ({{ $score }})
-                                        </span>
-                                    @else
-                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-500">
-                                            Pending QA
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button class="text-blue-600 hover:text-blue-900 font-semibold focus:outline-none">
-                                        View details
-                                    </button>
-                                </td>
-                            </tr>
-                        @empty
-                            <!-- Empty state if search returns no results -->
-                            <tr>
-                                <td colspan="6" class="px-6 py-10 whitespace-nowrap text-sm text-gray-500 text-center">
-                                    <div class="flex flex-col items-center justify-center">
-                                        <svg class="h-10 w-10 text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                        </svg>
-                                        <p>No hazard reports found.</p>
+                                
+                                <td class="px-5 py-4 whitespace-nowrap text-sm">
+                                    <!-- Flexbox to stack buttons on mobile and align them horizontally on desktop -->
+                                    <div class="flex flex-col md:flex-row gap-2 md:justify-end">
+                                        @if (is_null($report->qaReview))
+                                            <a href="{{ url('/sms/hazard-review/' . $report->id) }}" class="inline-flex justify-center items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none w-full md:w-auto">
+                                                Review
+                                            </a>
+                                        @else
+                                            <a href="{{ url('/sms/hazard-report-print/' . $report->id) }}" class="inline-flex justify-center items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none w-full md:w-auto">
+                                                View
+                                            </a>
+
+                                            @if (is_null($report->qaReview->actual_closure_date))
+                                                <button wire:click="closeHazard({{ $report->id }})" wire:loading.attr="disabled" class="inline-flex justify-center items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none w-full md:w-auto disabled:opacity-50">
+                                                    Close
+                                                </button>
+                                            @endif
+                                        @endif
                                     </div>
                                 </td>
                             </tr>
-                        @endforelse
+                        @endforeach
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination Controls -->
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                {{ $hazards->links() }}
+            
+            <!-- Pagination links -->
+            <div class="px-5 py-4 bg-white border-t border-gray-200">
+                {{ $reports->links() }}
             </div>
-        </div>
+        @endif
     </div>
 </div>
