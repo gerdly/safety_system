@@ -33,6 +33,11 @@ class PublicHazardReport extends Component
     {
         // Load all active companies to populate the dropdown
         $this->companies = Company::all();
+        $this->reporter_name = '';
+        $this->incident_date = '';
+        $this->department_area = '';
+        $this->employee_hazard_description = '';
+        $this->suggested_mitigation = '';
         
         // Default the incident date to today to improve mobile UX
         $this->incident_date = now()->format('Y-m-d');
@@ -68,6 +73,11 @@ class PublicHazardReport extends Component
 
     public function render()
     {
+         $this->reporter_name = '';
+        $this->incident_date = '';
+        $this->department_area = '';
+        $this->employee_hazard_description = '';
+        $this->suggested_mitigation = '';
         return view('livewire.public-hazard-report');
     }
 }
