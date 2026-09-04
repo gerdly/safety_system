@@ -13,15 +13,15 @@
                 <h3 class="text-2xl font-bold text-gray-800 mb-4">
                     Welcome, {{ auth()->user()->name }}!
                 </h3>
-                {{-- <p class="text-gray-600">
-                    Selecciona una opción del menú lateral para comenzar.
-                </p> --}}
+       
                 
                 @if(auth()->user()->role === 'superadmin')
                     <div class="mt-4 p-4 bg-blue-50 text-blue-700 rounded-md border border-blue-200">
                         <strong>Administrator Mode:</strong>Have full access to manage users, hazards, and system settings.
                     </div>
                 @endif
+                <!-- Render the analytics chart component -->
+                <livewire:sms-analytics-chart />
             </div>
         </div>
     </div>
