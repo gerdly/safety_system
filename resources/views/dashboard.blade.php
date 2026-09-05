@@ -20,6 +20,7 @@
                         <strong>Administrator Mode:</strong>Have full access to manage users, hazards, and system settings.
                     </div>
                 @endif
+                <br />
                 <!-- Render the analytics chart component -->
                 <livewire:sms-analytics-chart />
             </div>

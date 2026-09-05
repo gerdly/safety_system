@@ -1,4 +1,10 @@
-<div x-data="{ activeTab: 'risk' }" class="w-full">
+<div x-data="{ 
+        activeTab: 'risk',
+        hasData: {{ $initialChartData['hasData'] ? 'true' : 'false' }},
+        isFullYear: {{ $initialChartData['isFullYear'] ? 'true' : 'false' }}
+    }" 
+    @toggle-empty-state.window="hasData = $event.detail.hasData; isFullYear = $event.detail.isFullYear"
+    class="w-full">
     
     <!-- Dashboard Header & Filters -->
     <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
@@ -25,34 +31,38 @@
         <nav class="-mb-px flex space-x-8">
             <!-- Switch to Risk Tab -->
             <button @click.prevent="activeTab = 'risk'" 
-                    :class="activeTab === 'risk' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
+                    :class="{ 'border-blue-500 text-blue-600 font-bold': activeTab === 'risk', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium': activeTab !== 'risk' }"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors outline-none focus:outline-none">
                 Risk & Company Analysis
             </button>
+            
             <!-- Switch to Monthly Tab and trigger resize for ApexCharts to render properly when unhidden -->
             <button @click.prevent="activeTab = 'monthly'; setTimeout(() => window.dispatchEvent(new Event('resize')), 50);" 
-                    :class="activeTab === 'monthly' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                    class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    :class="{ 'border-blue-500 text-blue-600 font-bold': activeTab === 'monthly', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium': activeTab !== 'monthly' }"
+                    class="whitespace-nowrap py-4 px-1 border-b-2 text-sm transition-colors outline-none focus:outline-none">
                 Monthly Performance
             </button>
         </nav>
     </div>
 
-    <!-- Tab 1: Risk & Company Analysis -->
-    <div x-show="activeTab === 'risk'" x-cloak class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2 bg-white shadow-sm border border-gray-200 rounded-lg p-6">
+  <!-- Tab 1: Risk & Company Analysis -->
+    <div x-show="hasData && activeTab === 'risk'" x-cloak class="grid grid-cols-1 gap-6" :class="isFullYear ? 'lg:grid-cols-3' : 'lg:grid-cols-1'">
+        
+        <!-- Risk Trend Chart: Expands to full width if isFullYear is false -->
+        <div class="bg-white shadow-sm border border-gray-200 rounded-lg p-6" :class="isFullYear ? 'lg:col-span-2' : 'col-span-1'">
             <h3 class="text-lg text-gray-700 mb-4">Average of Severity, Likelihood and Risk Score by Date</h3>
             <div id="riskTrendChart" wire:ignore></div>
         </div>
         
-        <div class="lg:col-span-1 bg-white shadow-sm border border-gray-200 rounded-lg p-6 flex flex-col justify-center items-center">
-            <h3 class="text-lg text-gray-700 mb-4 w-full text-left">Hazard Reports by Company</h3>
-            <div id="companyPieChart" class="w-full" wire:ignore></div>
+        <!-- Quarter Pie Chart: Only shows when viewing the Full Year -->
+        <div x-show="isFullYear" class="lg:col-span-1 bg-white shadow-sm border border-gray-200 rounded-lg p-6 flex flex-col justify-center items-center">
+            <h3 class="text-lg text-gray-700 mb-4">Hazard Reports by Quarter</h3>
+            <div id="quarterPieChart" class="w-full" wire:ignore></div>
         </div>
     </div>
 
     <!-- Tab 2: Monthly Performance -->
-    <div x-show="activeTab === 'monthly'" x-cloak style="display: none;" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+   <div x-show="hasData && activeTab === 'monthly'" x-cloak style="display: none;" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white shadow-sm border border-gray-200 rounded-lg p-6">
             <h3 class="text-lg text-gray-700 mb-4">Sum and Average of Response Time by Month</h3>
             <div id="responseTimeChart" wire:ignore></div>
@@ -62,6 +72,14 @@
             <h3 class="text-lg text-gray-700 mb-4">Hazard Reports by Month</h3>
             <div id="monthlyReportsChart" wire:ignore></div>
         </div>
+    </div>
+    <!-- No Data Empty State -->
+    <div x-show="!hasData" x-cloak class="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center my-8">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-semibold text-gray-900">No reports found</h3>
+        <p class="mt-1 text-sm text-gray-500">There are no hazard reports recorded for the selected period.</p>
     </div>
 
     <!-- ApexCharts Initialization -->
@@ -80,23 +98,29 @@
                     { name: 'Avg Risk Score', data: initialData.riskTrend.risk }
                 ],
                 xaxis: { categories: initialData.riskTrend.categories },
-                colors: ['#3b82f6', '#10b981', '#d97706'], 
+                colors: ['#1e3a8a', '#64748b', '#ea580c'], 
                 legend: { position: 'bottom' }
             };
             let riskChart = new ApexCharts(document.querySelector("#riskTrendChart"), riskOptions);
             riskChart.render();
 
-            // 2. Company Pie Chart
+            // 2. Quarter Pie Chart
             let pieOptions = {
-                chart: { type: 'pie', height: 300 },
-                series: initialData.company.series.length > 0 ? initialData.company.series : [1],
-                labels: initialData.company.labels.length > 0 ? initialData.company.labels : ['No Data'],
-                colors: ['#0ea5e9', '#10b981', '#d97706'],
-                legend: { position: 'right' },
-                dataLabels: { enabled: false }
+                chart: { type: 'pie', height: 320 },
+                series: initialData.quarter.series.length > 0 ? initialData.quarter.series : [1],
+                labels: initialData.quarter.labels.length > 0 ? initialData.quarter.labels : ['No Data'],
+                // Colors representing the 4 quarters
+                colors: ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6'],
+                legend: { position: 'bottom' },
+                dataLabels: { 
+                    enabled: true,
+                    formatter: function (val) {
+                        return Math.round(val) + "%"
+                    }
+                }
             };
-            let pieChart = new ApexCharts(document.querySelector("#companyPieChart"), pieOptions);
-            pieChart.render();
+            let quarterChart = new ApexCharts(document.querySelector("#quarterPieChart"), pieOptions);
+            quarterChart.render();
 
             // 3. Response Time Line Chart
             let responseOptions = {
@@ -124,38 +148,52 @@
             let barChart = new ApexCharts(document.querySelector("#monthlyReportsChart"), barOptions);
             barChart.render();
 
-            // Listen for Livewire updates dispatched from the backend controller
+           // Listen for Livewire updates dispatched from the backend controller
             Livewire.on('update-charts', (event) => {
-                // Safe compatibility for Livewire v3 payload structures
                 let newData = event.chartData || (event[0] && event[0].chartData); 
+                if (!newData) return;
+
+                // Safely update Alpine component state passing both flags
+                window.dispatchEvent(new CustomEvent('toggle-empty-state', { 
+                    detail: { hasData: newData.hasData, isFullYear: newData.isFullYear } 
+                }));
+
+                if (!newData.hasData) return;
                 
-                if (!newData) {
-                    console.error("No data received from server", event);
-                    return;
-                }
-                
-                // 1. Update risk trend chart
-                riskChart.updateSeries([
-                    { data: newData.riskTrend.severity },
-                    { data: newData.riskTrend.likelihood },
-                    { data: newData.riskTrend.risk }
-                ]);
-                riskChart.updateOptions({ xaxis: { categories: newData.riskTrend.categories } });
+                // CRITICAL FIX: Wait 50ms for Alpine to remove display:none from the containers 
+                // before asking ApexCharts to calculate SVG dimensions and redraw.
+                setTimeout(() => {
+                    // 1. Update risk trend chart
+                    riskChart.updateSeries([
+                        { name: 'Avg Severity',data: newData.riskTrend.severity },
+                        { name: 'Avg Likelihood',data: newData.riskTrend.likelihood },
+                        { name: 'Avg Risk Score',data: newData.riskTrend.risk }
+                    ]);
+                    riskChart.updateOptions({ xaxis: { categories: newData.riskTrend.categories } });
 
-                // 2. Update company pie chart
-                pieChart.updateSeries(newData.company.series.length > 0 ? newData.company.series : [1]);
-                pieChart.updateOptions({ labels: newData.company.labels.length > 0 ? newData.company.labels : ['No Data'] });
+                    // 2. Update quarter pie chart (Only if full year is active)
+                    if (newData.isFullYear) {
+                        let qSeries = newData.quarter.series.length > 0 ? newData.quarter.series : [0];
+                        let qLabels = newData.quarter.labels.length > 0 ? newData.quarter.labels : ['No Data'];
+                        
+                        quarterChart.updateSeries(qSeries);
+                        quarterChart.updateOptions({ labels: qLabels });
+                    }
 
-                // 3. Update response time chart
-                responseChart.updateSeries([
-                    { data: newData.monthly.sumResponse },
-                    { data: newData.monthly.avgResponse }
-                ]);
-                responseChart.updateOptions({ xaxis: { categories: newData.monthly.categories } });
+                    // 3. Update response time chart
+                    responseChart.updateSeries([
+                        { name: 'Sum Response Time', data: newData.monthly.sumResponse },
+                        { name: 'Avg Response Time', data: newData.monthly.avgResponse }
+                    ]);
+                    responseChart.updateOptions({ xaxis: { categories: newData.monthly.categories } });
 
-                // 4. Update monthly reports bar chart
-                barChart.updateSeries([{ data: newData.monthly.totalReports }]);
-                barChart.updateOptions({ xaxis: { categories: newData.monthly.categories } });
+                    // 4. Update monthly reports bar chart
+                    barChart.updateSeries([{ data: newData.monthly.totalReports }]);
+                    barChart.updateOptions({ xaxis: { categories: newData.monthly.categories } });
+                    
+                    // Trigger a manual window resize event so the line chart recalculates its new full-width
+                    window.dispatchEvent(new Event('resize'));
+                }, 50);
             });
         });
     </script>

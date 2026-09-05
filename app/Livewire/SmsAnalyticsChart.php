@@ -54,9 +54,9 @@ class SmsAnalyticsChart extends Component
     {
         $monthsLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-        // Determine month ranges based on selected period
-        $startMonth = 1;
-        $endMonth = 12;
+        // 1. Establish strict, localized filter variables
+        $startMonth = null;
+        $endMonth = null;
         
         if ($this->selectedPeriod !== 'Full Year') {
             $quarterMonths = [
@@ -72,12 +72,15 @@ class SmsAnalyticsChart extends Component
             }
         }
 
-        // 1. Risk Trend Data (Requires QA Review to calculate scores)
+        // 2. Risk Trend Data 
+        // Use when() to safely inject month filters only if a quarter is selected
         $riskTrend = HazardReport::query()
             ->join('qa_reviews', 'hazard_reports.id', '=', 'qa_reviews.hazard_report_id')
             ->whereYear('hazard_reports.incident_date', $this->selectedYear)
-            ->whereMonth('hazard_reports.incident_date', '>=', $startMonth)
-            ->whereMonth('hazard_reports.incident_date', '<=', $endMonth)
+            ->when($startMonth && $endMonth, function ($query) use ($startMonth, $endMonth) {
+                return $query->whereMonth('hazard_reports.incident_date', '>=', $startMonth)
+                             ->whereMonth('hazard_reports.incident_date', '<=', $endMonth);
+            })
             ->select(
                 DB::raw('DATE(hazard_reports.incident_date) as date'),
                 DB::raw('ROUND(AVG(qa_reviews.severity_rating), 2) as avg_severity'),
@@ -88,33 +91,45 @@ class SmsAnalyticsChart extends Component
             ->orderBy('date')
             ->get();
 
-        // 2. Hazard Reports by Company (Counts ALL reports regardless of QA status)
-        $companyData = HazardReport::query()
-            ->join('companies', 'hazard_reports.company_id', '=', 'companies.id')
-            ->whereYear('hazard_reports.incident_date', $this->selectedYear)
-            ->whereMonth('hazard_reports.incident_date', '>=', $startMonth)
-            ->whereMonth('hazard_reports.incident_date', '<=', $endMonth)
-            ->select('companies.name', DB::raw('COUNT(*) as total'))
-            ->groupBy('companies.name')
+      // 3. Hazard Reports by Quarter 
+        // Note: This specific query intentionally ignores $startMonth and $endMonth filters 
+        // to always show the full year distribution context.
+        $quarterData = HazardReport::query()
+            ->whereYear('incident_date', $this->selectedYear)
+            ->select(DB::raw('QUARTER(incident_date) as quarter'), DB::raw('COUNT(*) as total'))
+            ->groupBy('quarter')
+            ->orderBy('quarter')
             ->get();
 
-        // 3. Monthly Total Reports (Counts ALL reports submitted in that month)
+        // Format quarter data arrays
+        $quarterLabels = [];
+        $quarterSeries = [];
+        foreach ($quarterData as $data) {
+            $quarterLabels[] = 'Q' . $data->quarter;
+            $quarterSeries[] = $data->total;
+        }
+
+        // 4. Monthly Total Reports 
         $monthlyTotals = HazardReport::query()
             ->whereYear('incident_date', $this->selectedYear)
-            ->whereMonth('incident_date', '>=', $startMonth)
-            ->whereMonth('incident_date', '<=', $endMonth)
+            ->when($startMonth && $endMonth, function ($query) use ($startMonth, $endMonth) {
+                return $query->whereMonth('incident_date', '>=', $startMonth)
+                             ->whereMonth('incident_date', '<=', $endMonth);
+            })
             ->select(DB::raw('MONTH(incident_date) as month'), DB::raw('COUNT(*) as total'))
             ->groupBy('month')
             ->get()
             ->keyBy('month');
 
-        // 4. Monthly Response Time (Strictly requires closed reports to calculate dates)
+        // 5. Monthly Response Time 
         $monthlyResponse = HazardReport::query()
             ->join('qa_reviews', 'hazard_reports.id', '=', 'qa_reviews.hazard_report_id')
             ->whereYear('hazard_reports.incident_date', $this->selectedYear)
-            ->whereMonth('hazard_reports.incident_date', '>=', $startMonth)
-            ->whereMonth('hazard_reports.incident_date', '<=', $endMonth)
             ->whereNotNull('qa_reviews.actual_closure_date')
+            ->when($startMonth && $endMonth, function ($query) use ($startMonth, $endMonth) {
+                return $query->whereMonth('hazard_reports.incident_date', '>=', $startMonth)
+                             ->whereMonth('hazard_reports.incident_date', '<=', $endMonth);
+            })
             ->select(
                 DB::raw('MONTH(hazard_reports.incident_date) as month'),
                 DB::raw('SUM(DATEDIFF(qa_reviews.actual_closure_date, hazard_reports.incident_date)) as sum_response'),
@@ -124,7 +139,7 @@ class SmsAnalyticsChart extends Component
             ->get()
             ->keyBy('month');
 
-        // Align X-axis categories dynamically by merging months that have either total reports or response times
+        // Align X-axis categories dynamically
         $allMonths = collect($monthlyTotals->keys())
             ->merge($monthlyResponse->keys())
             ->unique()
@@ -143,17 +158,24 @@ class SmsAnalyticsChart extends Component
             $totalReports[] = $monthlyTotals->has($m) ? $monthlyTotals[$m]->total : 0;
         }
 
-        // Format data into unified structure and enforce pure zero-indexed arrays for ApexCharts
-        return [
+        // Return clean structure. If a dataset is empty, it returns empty arrays.
+       return [
+            // Flag to tell the frontend if the entire dataset is empty for the selected filters
+            'hasData' => $riskTrend->isNotEmpty() || $quarterData->isNotEmpty() || $monthlyTotals->isNotEmpty(),
+           
+            // Flag to tell the frontend if we are viewing the full year
+            'isFullYear' => $this->selectedPeriod === 'Full Year',
+
             'riskTrend' => [
-                'categories' => array_values($riskTrend->pluck('date')->map(fn($d) => Carbon::parse($d)->format('M d'))->toArray()),
+               'categories' => array_values($riskTrend->pluck('date')->map(fn($d) => Carbon::parse($d)->format('M d'))->toArray()),
                 'severity' => array_values($riskTrend->pluck('avg_severity')->toArray()),
                 'likelihood' => array_values($riskTrend->pluck('avg_likelihood')->toArray()),
                 'risk' => array_values($riskTrend->pluck('avg_risk')->toArray()),
             ],
-            'company' => [
-                'labels' => array_values($companyData->pluck('name')->toArray()),
-                'series' => array_values($companyData->pluck('total')->toArray()),
+            // New Quarter data replacing Company/Department
+            'quarter' => [
+                'labels' => $quarterLabels,
+                'series' => $quarterSeries,
             ],
             'monthly' => [
                 'categories' => $monthlyCategories,
@@ -163,7 +185,7 @@ class SmsAnalyticsChart extends Component
             ]
         ];
     }
-    
+
 
     public function render()
     {
